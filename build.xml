@@ -46,30 +46,6 @@
     <!-- =================================================================== -->
     <!-- 执行测试案例 -->
     <!-- =================================================================== -->
-    <target name="junit" depends="compile">                
-        <junit printsummary="true" fork="true">        
-             <formatter type="xml" usefile="true"/>        
-            
-             <classpath refid="compile.path"/>        
-            
-            <batchtest fork="on" todir="${report.path}" haltonfailure="no">
-                <fileset dir="${build.path}">
-                    <include name="**/*MiguUiTestCase.class"/>
-                </fileset>
-            </batchtest>                 
-         </junit> 
-		 <!-- 产生单元测试报表文档 -->
-         <junitreport todir="${report.path}">
-             <fileset dir="${report.path}">
-                 <include name="TEST-*.xml" />
-             </fileset>
-             <report format="frames" todir="${report.path}" />
-         </junitreport>
-		 </target>
-		 <!-- 清除Junit生成的报表文档 -->
-    <target name="delete">
-        <delete dir="${report.path}"/>
-    </target>
 
     <!-- The local.properties file is created and updated by the 'android' tool.
          It contains the path to the SDK. It should *NOT* be checked into
