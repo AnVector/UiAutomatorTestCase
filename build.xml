@@ -1,51 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project name="MiguTestCase" default="help" basedir=".">
-	 <!-- =================================================================== -->
-     <!-- 变量设置  -->
-     <!-- =================================================================== -->
- 
-     <!-- 源代码src路径 -->
-     <property name="src.path" value="src/com/cmcc/uiautomator"/>
-     <!-- 编译文件class路径 -->
-     <property name="build.path" value="build"/>
-     <!-- 单元测试代码路径 -->
-     <property name="test.path" value="src/com/cmcc/uiautomator"/>
-     <!-- lib包路径 -->
-     <property name="lib.path" value="libs"/>
-	 <!-- jar包路径 -->
-    <property name="dist.path" value="dist"/>
-     <!-- 生成报告junit4.xml路径 -->
-     <property name="report.path" value="report"/>
-     <!-- =================================================================== -->
-     <!-- 设置classpath -->
-     <!-- =================================================================== -->
-     <path id="compile.path">        
-         <fileset dir="${lib.path}">
-             <include name="**/*.jar"/>
-         </fileset>         
-         <pathelement path="${build.path}"/>
-     </path>
-	 <!-- 初始化 -->
-	 <target name="init">
-         <mkdir dir="${build.path}"/>
-         <mkdir dir="${report.path}"/>
-		 <mkdir dir="${dist.path}"/>
-		 <mkdir dir="${test.path}"/>
-     </target>
-	 <!-- =================================================================== -->
-     <!-- 清除历史编译class -->
-     <!-- =================================================================== -->
-     <target name="clean" description="clean">
-         <delete dir="${build.path}"/>
-		 <delete dir="${report.path}"/>
-        <delete dir="${dist.path}"/>
-     </target>
-     <!-- =================================================================== -->
-     <!-- 编译测试文件，初始化目录 -->
-     <!-- =================================================================== -->	
-    <!-- =================================================================== -->
-    <!-- 执行测试案例 -->
-    <!-- =================================================================== -->
+<project name="MiguTestCase" default="help">
 
     <!-- The local.properties file is created and updated by the 'android' tool.
          It contains the path to the SDK. It should *NOT* be checked into

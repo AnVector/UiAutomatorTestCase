@@ -15,7 +15,6 @@ import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 
 import com.alibaba.fastjson.JSONObject;
-import com.android.uiautomator.core.Configurator;
 import com.android.uiautomator.core.UiCollection;
 import com.android.uiautomator.core.UiDevice;
 import com.android.uiautomator.core.UiObject;
@@ -35,14 +34,15 @@ import redis.clients.jedis.Jedis;
 /**
  * Created by Admin on 2017/8/27.
  */
-public class MiguUiTestCase extends UiAutomatorTestCase {
+public class MiguUiAutomator extends UiAutomatorTestCase {
 
-	private static final String TAG = MiguUiTestCase.class.getSimpleName();
+	private static final String TAG = MiguUiAutomator.class.getSimpleName();
 	private static final String FORMAT_LOG = "---->> %s [%s] %s";
-	private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+	private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	private static final SimpleDateFormat KEY_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
 	private static final Point[] POINT = { new Point(120, 550), new Point(400, 550), new Point(680, 550),
 			new Point(120, 1000), new Point(400, 1000), new Point(680, 1000) };
-	private static final Point[] MAIN_POINT = new Point[4];
+	private static final int PAY_POINT[] = { 258, 508, 788, 1068, 1258 };
 	private static final String[] PREFERENCE_SETTING = { "publish_img1", "boy_img3", "girl_img2" };
 	private static Point endPoint;
 	private static String redis_ip;
@@ -60,28 +60,36 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	private static long endTime;
 	private static UserInfo userInfo;
 	private static DeviceInfo deviceInfo;
-	private static int bookCount = 3;// 默认阅读1本免费书籍
+	private static int bookCount = 3;// 默认阅读3本免费书籍
 	private static int pageCount = 30;// 默认单本阅读30页
-	private static int userType = 2;// 默认账号类型为自定义账号
+	private static int userType = 3;// 默认账号类型为无账号
 	private static int taskType = 1;// 默认任务类型为PV操作
 	private static int setOrNot = 0;// 默认不设置指定参数
 	private static int preBalance = 0;// 预支付金额
 	private static int actualBalance = 0; // 实际支付金额
 	private static int count = 0; // 用户数
+	private static int pay_point_index = 0;
+	private static boolean valid = false;
 
 	@Override
 	protected void setUp() throws Exception {
 		log("setUp of " + getName());
 		redis_ip = getParams().getString("ip");
 		setAssert("please tell me a valid ip address of redis", (!TextUtils.isEmpty(redis_ip)));
-		log("ip=" + redis_ip);
+		log("redis_ip=" + redis_ip);
 		redis_key = getParams().getString("key");
 		setAssert("please tell me a valid account key of redis", (!TextUtils.isEmpty(redis_key)));
-		log("key=" + redis_key);
+		log("redis_key=" + redis_key);
 		file_path = Environment.getDataDirectory() + "/data/" + GlobalConsts.PACKAGE_NAME
 				+ "/shared_prefs/CMReader.xml";
 		jedis = new Jedis(redis_ip, GlobalConsts.REDIS_PORT);
 		jedis.auth(GlobalConsts.REDIS_PWD);
+		log("当前版本：" + GlobalConsts.RELEASE_VERSION);
+		if (taskType == 1) {
+			log("阅读书目数量：" + bookCount);
+			log("单本阅读页数：" + pageCount);
+			log("翻页时间间隔：" + GlobalConsts.PAGE_TURNING_TIME_INTERVAL + "ms");
+		}
 		// config();
 		init();
 		registerUiWatcher();
@@ -103,11 +111,6 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	private static void init() {
 		int x = UiDevice.getInstance().getDisplayWidth();
 		int y = UiDevice.getInstance().getDisplayHeight();
-		int centerY = y - 190;
-		for (int i = 0; i < MAIN_POINT.length; i++) {
-			MAIN_POINT[i] = new Point(x / 2, centerY);
-			centerY -= 140;
-		}
 		endPoint = new Point();
 		endPoint.x = x;
 		endPoint.y = y;
@@ -142,10 +145,10 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	/*
 	 * 配置参数
 	 **/
-	private static void config() {
-		Configurator.getInstance().setWaitForSelectorTimeout(GlobalConsts.TIME_OUT_FOR_EXISTS)
-				.setScrollAcknowledgmentTimeout(GlobalConsts.TIME_OUT_SCROLL_ACKNOWLEDGEMENT);
-	}
+	// private static void config() {
+	// Configurator.getInstance().setWaitForSelectorTimeout(GlobalConsts.TIME_OUT_FOR_EXISTS)
+	// .setScrollAcknowledgmentTimeout(GlobalConsts.TIME_OUT_SCROLL_ACKNOWLEDGEMENT);
+	// }
 
 	private static String parseUserObj2Str() {
 		if (userInfo == null) {
@@ -193,44 +196,38 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	public void testCase() {
+		String accountInfo = null;
 		while ((jedis.llen(redis_key) > 0)) {
+			log("当前账号数量:" + jedis.llen(redis_key));
 			try {
-				String accountInfo = jedis.rpop(redis_key);
-				if (TextUtils.isEmpty(accountInfo)) {
-					return;
-				} else {
-					onStart();
-					log("获取到第" + count + "账号:" + accountInfo);
-					// 解析参数
+				log("上一账号是否可用: " + valid);
+				if (!valid) {
+					accountInfo = jedis.rpop(redis_key);
+					if (TextUtils.isEmpty(accountInfo))
+						return;
+					count++;
+					log("获取到第" + count + "个账号:" + accountInfo);
 					resolveParams(accountInfo);
-					// 清除应用缓存
-					clearCache();
-					// 设置参数
-					setRandomIMEI();
-					// // 启动咪咕阅读客户端
-					launchApp();
-					// 偏好设置
-					if (setOrNot == 0) {// 新增用户
-						preferenceSetting();
-					}
-					// 关闭一键发送登录短信提示框
-					closeSmsDialog();
-					// 解析应用参数
-					parseXML();
-					// 登录
-					// if (userType != 3) {// 非游客账户
-					// firstToLoginPage();
-					// firstLogin();
-					// handleDrawer();
-					// }
-					// 执行任务
-					excuteTask();
-					// 返回首页
-					backToMainPage();
-					resultCode = 1;
-					resultMsg = "ok";
-					log("全部免费书目阅读结束，卸载咪咕阅读客户端，重新安装后重置imei，切换用户");
 				}
+				onStart();
+				clearCache();
+				// setRandomImei();
+				setRandomIMEI();
+				launchApp();
+				preferenceSetting();
+				closeSmsDialog();
+				parseXML();
+				if (userType != 3) {// 非游客账户
+					firstToLoginPage();
+					firstLogin();
+					handleDrawer();
+				}
+				restoreDeviceInfo();
+				valid = false;
+				excuteTask();
+				backToMainPage();
+				resultCode = 1;
+				resultMsg = "ok";
 			} catch (Exception e) {
 				log(e.toString());
 			} finally {
@@ -241,26 +238,31 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	private void onStart() {
-		count++;
+		resultCode = 0;
+		resultMsg = "";
 		startTime = getNowTime();
+		valid = ((userType < 3 && setOrNot == 0) ? true : false);
 	}
 
 	private void onFinish() {
+		deviceInfo = null;
 		endTime = getNowTime();
-		String duration = (endTime - startTime) / 1000 + "s";
+		String duration = (endTime - startTime) / 1000 + "";
 		String date = DATE_FORMAT.format(new Date());
-		log("账号" + userName + "共耗时" + duration);
-		if (userType != 3 && userInfo != null) {
+		if (userInfo != null && !valid) {
 			userInfo.setDuration(duration).setCreateTime(date).setResultCode(resultCode + "").setResultMsg(resultMsg)
-					.setTaskType(taskType + "").setCustomerKey(GlobalConsts.KEY + "_" + (taskType));
+					.setTaskType(taskType + "").setCustomerKey(redis_key).setSetOrNot(setOrNot + "");
 			String json_result = parseUserObj2Str();
-			jedis.rpush(GlobalConsts.KEY + "_" + taskType, json_result);
 			log("--send result：" + json_result);
+			if (setOrNot == 0) {
+				jedis.rpush(redis_key + "_" + KEY_DATE_FORMAT.format(new Date()), json_result);
+			} else {
+				jedis.rpush(redis_key + "_remain" + "_" + KEY_DATE_FORMAT.format(new Date()), json_result);
+			}
 		}
 	}
 
 	private void excuteTask() throws UiObjectNotFoundException {
-		log("step8:执行阅读/支付任务");
 		switch (taskType) {
 		case 2:
 			pay();
@@ -272,37 +274,21 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	private void read() throws UiObjectNotFoundException {
+		log("step8:执行阅读任务");
 		int index = checkUI();
-		for (int i = 0; i < bookCount; i++) {
+		int count = ((setOrNot == 1) ? 1 : bookCount);
+		for (int i = 0; i < count; i++) {
 			readFreeBook(index);
 			index++;
 		}
 	}
 
-	// private static void openDetailPage() throws UiObjectNotFoundException {
-	// while (true) {
-	// openSearchPage();
-	// UiObject mEdtSearch = getUiObjectById("etSearch", "search edit");
-	// mEdtSearch.setText(Utf7ImeHelper.e("11处特工皇妃"));
-	// UiObject mHot = new UiObject(new UiSelector().textContains("热门搜索"));
-	// if (mHot.exists()) {
-	// mHot.clickAndWaitForNewWindow();
-	// break;
-	// } else {
-	// UiObject mWebBackBtn = getUiObjectById("web_back_arrowhead", "search page
-	// back button");
-	// mWebBackBtn.clickAndWaitForNewWindow();
-	// }
-	// }
-	// }
-
 	private static UiScrollable openDownloadPage() throws UiObjectNotFoundException {
 		openDailyReadPage();
-		int y = 258;
-		while (true) {
-			openBookDetailPage(y);
+		while (pay_point_index < 5) {
+			openBookDetailPage(PAY_POINT[pay_point_index]);
 			UiDevice.getInstance().click(458, 569);
-			if (y == 258) {
+			if (!(count == 1 && pay_point_index != 0)) {
 				SystemClock.sleep(500L);
 				UiDevice.getInstance().click(458, 569);
 			}
@@ -319,9 +305,10 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 				}
 				log("当前页面为“书籍详情”页面");
 				getUiObjectById("titlebar_level_2_back_button", "book detail back button").click();
-				y = (y >= 1000 ? y + 240 : y + 280);
+				pay_point_index++;
 			}
 		}
+		return null;
 
 	}
 
@@ -341,6 +328,7 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	private void pay() throws UiObjectNotFoundException {
+		log("step8:执行支付任务");
 		// 查找所有书目的章节
 		UiScrollable mListView = openDownloadPage();
 		mListView.setAsVerticalList();
@@ -348,27 +336,18 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		if (mListView.isScrollable()) {
 			mListView.flingToEnd(mListView.getMaxSearchSwipes());
 		}
-		// else {
-		// log("执行拖拽");
-		// UiDevice.getInstance().swipe(endPoint.x / 2, 1100, endPoint.x / 2, 100, 3);
-		// }
 		// 查找价格显示控件
 		UiObject mPrice = getUiObjectById("tv_totalNeed2PayCount", "download page price text");
 		// 选择要下载的章节直至付费的价格大于5元
 		int index = 1;
 		UiObject mItem = null;
-		while (Float.parseFloat(mPrice.getText().trim()) * 100 < preBalance) {
+		while (Float.parseFloat(mPrice.getText().trim()) * 100 <= preBalance) {
 			mItem = mListView.getChild(
 					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/checkbox_group").instance(index));
 			setAssert("chapter item by index not found", mItem.exists());
 			mItem.click();
 			index++;
 		}
-		if (mItem.exists()) {
-			mItem.click();
-		}
-		actualBalance = (int) (Float.parseFloat(mPrice.getText().trim()) * 100);
-		userInfo.setActualBalance(actualBalance + "");
 		// 点击“去结算”按钮
 		log("点击“去结算”按钮");
 		UiObject mDownloadBtn = getUiObjectById("btn_settleUp", "download button");
@@ -388,9 +367,18 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		log("点击“书券”选项");
 		mTicketOption.click();
 		// 查找“立即支付”按钮并点击
-		// UiObject mPayBtn = getUiObjectById("order_pay_view", "order page pay
-		// button");
-		// mPayBtn.click();
+		UiObject mPayBtn = getUiObjectById("order_pay_view", "order page pay button");
+		if (mPayBtn.exists() && mPayBtn.getText().trim().contains("立即支付")) {
+			UiObject mVipFee = getUiObjectById("vip_fee_view", "order page fee view");
+			String mFee = mVipFee.getText().trim().replace("元", "");
+			actualBalance = (int) (Float.parseFloat(mFee) * 100);
+			userInfo.setActualBalance(actualBalance + "");
+			mPayBtn.click();
+		} else {
+			userInfo.setActualBalance("0");
+			setAssert("pay failed because of not sufficient funds", true);
+			throw new UiObjectNotFoundException("pay failed because of not sufficient funds");
+		}
 	}
 
 	private static void resolveParams(String accountInfo) {
@@ -412,14 +400,15 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		if (taskType == 2) {// 支付
 			preBalance = Integer.parseInt(userInfo.getPreBalance());
 		}
-		if (setOrNot == 1) {
-			String device = jedis.get(userName + "_" + GlobalConsts.KEY);
-			if (TextUtils.isEmpty(device)) {
-				setOrNot = 0;
-			} else {
-				deviceInfo = JSONObject.parseObject(device, DeviceInfo.class);
-			}
+		// if (setOrNot == 1) {
+		String device = jedis.get(userName + "_" + redis_key);
+		if (TextUtils.isEmpty(device)) {
+			setOrNot = 0;
+		} else {
+			deviceInfo = JSONObject.parseObject(device, DeviceInfo.class);
+			setOrNot = 1;
 		}
+		// }
 	}
 
 	/*
@@ -440,8 +429,7 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	private void backToMainPage() throws UiObjectNotFoundException {
 		UiObject mBackBtn = getUiObjectById("titlebar_level_2_back_button", "free channel back button");
 		mBackBtn.clickAndWaitForNewWindow();
-		UiObject mSearchBackBtn = getUiObjectById("web_back_arrowhead", "search page back button");
-		mSearchBackBtn.clickAndWaitForNewWindow();
+		UiDevice.getInstance().pressBack();
 	}
 
 	/*
@@ -463,17 +451,17 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 			stringValue = element.getStringValue();
 			if (attributeValue.equals("device_id")) {
 				imei = stringValue;
-				// if(deviceInfo!=null) {
-				// deviceInfo.setImei(imei);
-				// }
+				if (deviceInfo != null) {
+					deviceInfo.setImei(imei);
+				}
 				log("当前IMEI:" + imei);
 			}
 			if (attributeValue.equals("device_mac_address")) {
 				macAddress = stringValue;
-				// if(deviceInfo!=null) {
-				// deviceInfo.setMacAddr(macAddress);
-				// }
-				log("当前mac address:" + macAddress);
+				if (deviceInfo != null) {
+					deviceInfo.setMacAddr(macAddress);
+				}
+				log("当前MAC:" + macAddress);
 			}
 			if (attributeValue.equals("channel_id")) {
 				channelId = stringValue;
@@ -481,30 +469,67 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 				log("当前渠道:" + channelId);
 			}
 		}
-
 	}
 
 	/*
 	 * 判断抽屉是否收回
 	 **/
 	private static void handleDrawer() throws UiObjectNotFoundException {
-		while (true) {
-			UiObject mDrawerLayout = new UiObject(
-					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/drawer_layout_mine"));
-			if (mDrawerLayout.exists()) {
-				// if (setOrNot == 0 && userType != 3) {
-				// String json_device = parseDeviceObj2Str();
-				// jedis.set(userName + "_" + GlobalConsts.KEY, json_device);
-				// }
-				UiDevice.getInstance().pressBack();
-				// if(taskType == 2) {
-				// UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth()/2,
-				// 1050);
-				// }
-				break;
-			} else {
-				retry();
+		UiObject mDrawerLayout = getUiObjectById("drawer_layout_mine", "main drawer layout");
+		if (mDrawerLayout.exists()) {
+			if (taskType == 2) {
+				bTokenCheck();
 			}
+			UiDevice.getInstance().pressBack();
+		}
+		UiObject mSearchView = getUiObjectById("recom_btn_search", "main search button");
+		if (!mSearchView.exists()) {
+			UiObject mLoginError = new UiObject(
+					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/tv_main_error_message"));
+			mLoginError.waitForExists(5 * 1000L);
+			if (mLoginError.exists()) {
+				setAssert(mLoginError.getText().trim(), true);
+				throw new UiObjectNotFoundException(mLoginError.getText().trim());
+			} else {
+				setAssert("main top search view", true);
+				throw new UiObjectNotFoundException("main top search view");
+			}
+		}
+	}
+
+	private static void bTokenCheck() throws UiObjectNotFoundException {
+		UiObject mTicket = getUiObjectById("fl_assets", "ticket item");
+		if (mTicket.exists()) {
+			UiObject mPrice = mTicket
+					.getChild(new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/item_tv_detail"));
+			String mDes = mPrice.getText().trim();
+			if (mDes.contains("元")) {
+				log("账户余额：" + mDes);
+				mDes = mDes.replace("元", "");
+				int value = (int) (Float.parseFloat(mDes) * 100);
+				if (value == 0) {
+					setAssert("account balance is insufficient", true);
+					throw new UiObjectNotFoundException("account balance is insufficient");
+				} else {
+					preBalance = Math.min(preBalance, value);
+				}
+			}
+		}
+	}
+
+	/*
+	 * 保存设备信息
+	 **/
+	private static void restoreDeviceInfo() {
+		if (setOrNot == 1)
+			return;
+		String json_device = parseDeviceObj2Str();
+		if (TextUtils.isEmpty(json_device))
+			return;
+		if (userType == 3) {
+			jedis.rpush(KEY_DATE_FORMAT.format(new Date()) + "_" + "imei", json_device);
+		} else {
+			jedis.rpush(userName + "_" + redis_key, json_device);
 		}
 	}
 
@@ -512,81 +537,61 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	 * 打开搜索页面
 	 **/
 	private static void openSearchPage() throws UiObjectNotFoundException {
-		// 查找首页顶部搜索框控件并点击
 		log("查找首页顶部搜索框控件");
-		UiObject mSearchView = getUiObjectById("recom_bookstore_default_search_text", "migu search view");
+		UiObject mSearchView = getUiObjectById("recom_btn_search", "main search button");
 		log("点击首页顶部搜索框打开搜索页面");
-		mSearchView.clickAndWaitForNewWindow();
+		if (mSearchView.exists()) {
+			UiDevice.getInstance().click(608, 53);
+			mSearchView.clickAndWaitForNewWindow();
+		} else {
+			setAssert("main top search view", true);
+			throw new UiObjectNotFoundException("main top search view");
+		}
 	}
 
 	/*
 	 * 通过搜索页面打开“免费频道”页面
 	 **/
 	private void openFreeChannelBySearch() throws UiObjectNotFoundException {
-		// while (true) {
 		openSearchPage();
 		UiObject mEdtSearch = getUiObjectById("etSearch", "search edit");
+		if (!mEdtSearch.exists()) {
+			UiDevice.getInstance().click(endPoint.x / 2, 55);
+			mEdtSearch = getUiObjectById("etSearch", "search edit");
+		}
 		mEdtSearch.setText(Utf7ImeHelper.e("免费频道"));
-
 		UiObject mSearchBtn = getUiObjectById("btn_search", "search button");
 		mSearchBtn.clickAndWaitForNewWindow();
-
 		UiObject mWebKit = new UiObject(new UiSelector().className("android.webkit.WebView"));
 		mWebKit.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS);
 		setAssert("search result webview page not exists", mWebKit.exists());
 		if (mWebKit.exists()) {
-			UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth() / 2, 220);
+			UiDevice.getInstance().click(endPoint.x / 2, 220);
 		} else {
 			log("搜索结果页面未加载成功");
 			throw new UiObjectNotFoundException("search result webview page load failed");
 		}
+		int k = 0;
+		while (true) {
+			UiObject mTitle = getUiObjectById("titlebar_text_not_used", "free channel page");
+			if (mTitle.exists()) {
+				break;
+			}
+			if (k++ == 0) {
+				log("未成功打开免费频道，再次尝试打开");
+				UiDevice.getInstance().click(endPoint.x / 2, 220);
+			} else {
+				throw new UiObjectNotFoundException("free channel page load failed");
+			}
+		}
 	}
 
-	// /*
-	// * 进入免费频道
-	// */
-	// // 查找“今日限免”书目
-	// private int checkUI() throws UiObjectNotFoundException {
-	// // openFreeChannelFromMain();
-	// openFreeChannelBySearch();
-	// int index = 9;
-	// getUiObjectById(GlobalConsts.PACKAGE_NAME, "titlebar_text_not_used", "book
-	// details page");
-	// int result = judgePageType();
-	// if (result == 0) {// 非web页面，直接通过resourceId获取书目
-	// log("判断今日限免书目是否已经结束");
-	// UiObject mTextHint = new UiObject(new UiSelector().index(8));
-	// setAssert("text hint not exists", mTextHint.exists());
-	// String description = mTextHint.getContentDescription();
-	// if (description != null && description.contains("已结束")) {
-	// log("今日限免活动已结束，开始查找“咪咕限免”书目");
-	// index = 13;
-	// } else {
-	// log("今日限免活动未结束，开始查找“今日限免”书目");
-	// }
-	// UiObject mFreeBook = new UiObject(new UiSelector().index(index));
-	// if (!mFreeBook.exists()) {
-	// UiDevice.getInstance().pressBack();
-	// checkUI();
-	// }
-	// return index;
-	// } else {// web页面，通过坐标获取书目
-	// return -1;
-	// }
-	//
-	// }
-
 	/*
-	 * 进入免费频道
+	 * 进入免费频道 查找“今日限免”书目
 	 */
-	// 查找“今日限免”书目
 	private int checkUI() throws UiObjectNotFoundException {
 		openFreeChannelBySearch();
 		int index = 9;
-		UiObject mTitle = getUiObjectById("titlebar_text_not_used", "free channel page");
-		if (!mTitle.exists()) {
-			throw new UiObjectNotFoundException("free channel page load failed");
-		}
 		int result = judgePageType();
 		if (result == 0) {// 非web页面，直接通过resourceId获取书目
 			log("判断今日限免书目是否已经结束");
@@ -639,27 +644,6 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		mLoginBtn.clickAndWaitForNewWindow();
 	}
 
-	private static void retry() throws UiObjectNotFoundException {
-		UiObject mErrorDialog = new UiObject(
-				new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/tv_main_choice"));
-		if (mErrorDialog.exists()) {
-			UiObject mErrorHint = getUiObjectById("tv_main_error_message", "login error dialog hint");
-			resultMsg = mErrorHint.getText();
-			mErrorDialog.click();
-			while (true) {
-				String accountInfo = jedis.rpop(redis_key);
-				if (TextUtils.isEmpty(accountInfo)) {
-					break;
-				} else {
-					log("获取到账号:" + accountInfo);
-					// 解析参数
-					resolveParams(accountInfo);
-				}
-			}
-			firstLogin();
-		}
-	}
-
 	private static void closeSmsDialog() throws UiObjectNotFoundException {
 		log("step6:关闭短信快速登录提示框");
 		UiObject mTextHint = getUiObjectById("ckb_never_remind", "never remind check button");
@@ -699,6 +683,8 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	 * 偏好设置
 	 **/
 	private static void preferenceSetting() throws UiObjectNotFoundException {
+		if (setOrNot == 1)
+			return;
 		log("step5:阅读偏好设置");
 		Random random = new Random();
 		int index = random.nextInt(3);
@@ -717,27 +703,52 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	/*
+	 * 打开008修改器
+	 **/
+	// private static void launch008K() throws IOException {
+	// log("--launch 008K app");
+	// Runtime.getRuntime().exec("monkey -p " + GlobalConsts.EXPOSED_PACKAGE_NAME +
+	// " -v 1");
+	// }
+
+	/*
+	 * 生成随机参数
+	 **/
+	// private static void setProperty() throws UiObjectNotFoundException {
+	// // UiObject mCircle = getUiObjectById("main_centerImg", "008K center img
+	// // circle");
+	// // mCircle.clickAndWaitForNewWindow();
+	// UiObject mNetRandom = getUiObjectById("set_value_fromNet");
+	// mNetRandom.click();
+	// UiObject mSave = getUiObjectById("button_restore");
+	// mSave.click();
+	// }
+
+	/*
 	 * 设置特定参数并点击保存按钮
 	 **/
 	private static void setProperties() throws UiObjectNotFoundException {
 		log("--set properties");
+		if (deviceInfo == null) {
+			setOrNot = 0;
+		}
 		if (setOrNot == 1) {// 给定参数
 			setGivenParams(getUiObjectById("imei"), deviceInfo.getImei());
 			setGivenParams(getUiObjectById("android_id"), deviceInfo.getAndroidId());
 			setGivenParams(getUiObjectById("mac"), deviceInfo.getMacAddr());
-			setGivenParams(getUiObjectById("ssid"), deviceInfo.getSSID());
-			setGivenParams(getUiObjectById("bssid"), deviceInfo.getBSSID());
+//			setGivenParams(getUiObjectById("ssid"), deviceInfo.getSSID());
+//			setGivenParams(getUiObjectById("bssid"), deviceInfo.getBSSID());
 			setGivenParams(getUiObjectById("phoneNo"), deviceInfo.getPhoneNum());
 			setGivenParams(getUiObjectById("simSerial"), deviceInfo.getICCID());
 			setGivenParams(getUiObjectById("subscriberId"), deviceInfo.getIMSI());
-			// setGivenParams(getUiObjectById("simState"), deviceInfo.getSimStatus());
-			// setGivenParams(getUiObjectById("operId"), deviceInfo.getOperatorId());
-			// setGivenParams(getUiObjectById("operName"), deviceInfo.getOperatorName());
-			// setGivenParams(getUiObjectById("isoCode"), deviceInfo.getCountryCode());
-			// setGivenParams(getUiObjectById("MODEL"), deviceInfo.getModel());
-			// setGivenParams(getUiObjectById("MANUFACTURER"), deviceInfo.getManufacture());
-			// setGivenParams(getUiObjectById("HARDWARE"), deviceInfo.getHardware());
-			// setGivenParams(getUiObjectById("BRAND"), deviceInfo.getBrand());
+//			setGivenParams(getUiObjectById("simState"), deviceInfo.getSimStatus());
+//			setGivenParams(getUiObjectById("operId"), deviceInfo.getOperatorId());
+//			setGivenParams(getUiObjectById("operName"), deviceInfo.getOperatorName());
+//			setGivenParams(getUiObjectById("isoCode"), deviceInfo.getCountryCode());
+			setGivenParams(getUiObjectById("MODEL"), deviceInfo.getModel());
+			setGivenParams(getUiObjectById("MANUFACTURER"), deviceInfo.getManufacture());
+//			setGivenParams(getUiObjectById("HARDWARE"), deviceInfo.getHardware());
+			setGivenParams(getUiObjectById("BRAND"), deviceInfo.getBrand());
 			getUiObjectById("button1").click();
 		} else {// 未指定参数
 			getUiObjectById("button2").click();
@@ -745,18 +756,18 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 				setGivenParams(getUiObjectById("phoneNo"), "+86" + userName);
 				getUiObjectById("button1").click();
 			}
-			// if (deviceInfo == null) {
-			// deviceInfo = new DeviceInfo();
-			// }
-			// deviceInfo.setAndroidId(getUiObjectById("android_id").getText()).setSSID(getUiObjectById("ssid").getText())
-			// .setBSSID(getUiObjectById("bssid").getText()).setPhoneNum(getUiObjectById("phoneNo").getText())
-			// .setICCID(getUiObjectById("simSerial").getText()).setIMSI(getUiObjectById("subscriberId").getText())
-			// .setSimStatus(getUiObjectById("simState").getText())
-			// .setOperatorId(getUiObjectById("operId").getText())
-			// .setOperatorName(getUiObjectById("operName").getText())
-			// .setCountryCode(getUiObjectById("isoCode").getText()).setModel(getUiObjectById("MODEL").getText())
-			// .setManufacture(getUiObjectById("MANUFACTURER").getText())
-			// .setHardware(getUiObjectById("HARDWARE").getText()).setBrand(getUiObjectById("BRAND").getText());
+			if (deviceInfo == null) {
+				deviceInfo = new DeviceInfo();
+			}
+			deviceInfo.setAndroidId(getUiObjectById("android_id").getText()).setSSID(getUiObjectById("ssid").getText())
+					.setBSSID(getUiObjectById("bssid").getText()).setPhoneNum(getUiObjectById("phoneNo").getText())
+					.setICCID(getUiObjectById("simSerial").getText()).setIMSI(getUiObjectById("subscriberId").getText())
+					.setSimStatus(getUiObjectById("simState").getText())
+					.setOperatorId(getUiObjectById("operId").getText())
+					.setOperatorName(getUiObjectById("operName").getText())
+					.setCountryCode(getUiObjectById("isoCode").getText()).setModel(getUiObjectById("MODEL").getText())
+					.setManufacture(getUiObjectById("MANUFACTURER").getText())
+					.setHardware(getUiObjectById("HARDWARE").getText()).setBrand(getUiObjectById("BRAND").getText());
 		}
 	}
 
@@ -803,6 +814,14 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	}
 
 	/*
+	 * 关闭IMEI修改器
+	 **/
+	// private static void exit008K() throws IOException {
+	// log("--exit 008K app");
+	// // UiDevice.getInstance().pressHome();
+	// }
+
+	/*
 	 * 生成随机IMEI
 	 **/
 	private static void setRandomIMEI() throws IOException, UiObjectNotFoundException {
@@ -811,6 +830,17 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		setProperties();
 		exitXposed();
 	}
+
+	/*
+	 * 生成随机Imei
+	 **/
+	// private static void setRandomImei() throws IOException,
+	// UiObjectNotFoundException {
+	// log("step3:设置参数");
+	// launch008K();
+	// setProperty();
+	// exit008K();
+	// }
 
 	/*
 	 * 免费频道“今日限免书籍”单本书籍模拟阅读
@@ -840,10 +870,8 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 			}
 		}
 		UiObject mTitle = getUiObjectById("titlebar_text", "book details page");
-		// setAssert("书籍详情未匹配成功", mTitle.getText().trim().contains("书籍详情"));
-		log(mTitle.getText().trim());
-		log("书籍详情匹配成功");
-		openBookByDrag();
+		log("书籍详情匹配成功：" + mTitle.getText().trim());
+		openBookByDrag(index);
 		readBook(index);
 		closeBookShelfDialog();
 		// 返回到“书籍详情”，点击导航栏返回按钮，返回到“免费频道”
@@ -853,12 +881,12 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 		getUiObjectById("titlebar_text", "middle free channel page");
 	}
 
-	private void openBookByDrag() {
+	private void openBookByDrag(int index) {
 		log("等待4s,以使书籍详情页面加载完成");
 		SystemClock.sleep(4 * 1000L);
 		UiDevice.getInstance().click(endPoint.x - 5, 440);
-		SystemClock.sleep(500L);
-		UiDevice.getInstance().swipe(endPoint.x - 5, 440, 0, 440, 4);
+		SystemClock.sleep(1000L);
+		UiDevice.getInstance().swipe(endPoint.x - 5, 440, 0, 440, 5);
 	}
 
 	private void readBook(int index) {
@@ -901,19 +929,20 @@ public class MiguUiTestCase extends UiAutomatorTestCase {
 	 * 关闭“加入书架”提示框
 	 **/
 	private static void closeBookShelfDialog() throws UiObjectNotFoundException {
-		while (true) {
-			UiDevice.getInstance().pressBack();
-			log("结束阅读，点击返回键后，等待5s");
-			SystemClock.sleep(5 * 1000L);
-			UiObject mCancelBtn = new UiObject(
-					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/button_cancel"));
+		UiDevice.getInstance().pressBack();
+		int count = 0;
+		while (count++ < 2) {
+			UiObject mCancelBtn = getUiObjectById("button_cancel", "book shelf dialog cancel button");
 			if (mCancelBtn.exists()) {
 				mCancelBtn.click();
 				break;
-			} else {
-				UiObject mBackBtn = getUiObjectById("titlebar_level_2_back_button", "book order page");
-				mBackBtn.click();
 			}
+			UiDevice.getInstance().click(endPoint.x / 2, endPoint.y / 2);
+		}
+
+		if (count == 2) {
+			setAssert("add to book shelf dialog closed failed ", true);
+			throw new UiObjectNotFoundException("add to book shelf dialog closed failed");
 		}
 	}
 
