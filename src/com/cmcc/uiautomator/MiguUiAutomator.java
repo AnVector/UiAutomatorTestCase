@@ -37,6 +37,7 @@ import redis.clients.jedis.Jedis;
 public class MiguUiAutomator extends UiAutomatorTestCase {
 
 	private static final String TAG = MiguUiAutomator.class.getSimpleName();
+//	private static Logger mLogger;
 	private static final String FORMAT_LOG = "---->> %s [%s] %s";
 	private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private static final SimpleDateFormat KEY_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
@@ -44,7 +45,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 			new Point(120, 1000), new Point(400, 1000), new Point(680, 1000) };
 	private static final int PAY_POINT[] = { 258, 508, 788, 1068, 1258 };
 	private static final String[] PREFERENCE_SETTING = { "publish_img1", "boy_img3", "girl_img2" };
-	private static Point endPoint;
+	private static Point endPoint = new Point();
 	private static String redis_ip;
 	private static String redis_key;
 	private static String file_path = "";
@@ -109,12 +110,22 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	}
 
 	private static void init() {
-		int x = UiDevice.getInstance().getDisplayWidth();
-		int y = UiDevice.getInstance().getDisplayHeight();
-		endPoint = new Point();
-		endPoint.x = x;
-		endPoint.y = y;
+		endPoint.x = UiDevice.getInstance().getDisplayWidth();
+		endPoint.y = UiDevice.getInstance().getDisplayHeight();
+//		initLog4j();
 	}
+
+//	private static void initLog4j() {
+//		LogConfigurator logConfigurator = new LogConfigurator();
+//		logConfigurator.setFileName(Environment.getExternalStorageDirectory() + File.separator + redis_key + ".log");
+//		logConfigurator.setRootLevel(Level.DEBUG);
+//		logConfigurator.setFilePattern("%d %-5p [%c{2}]-[%L] %m%n");
+//		logConfigurator.setLevel("org.apache", Level.ERROR);
+//		logConfigurator.setMaxFileSize(1024 * 1024 * 2);
+//		logConfigurator.setImmediateFlush(true);
+//		logConfigurator.configure();
+//		mLogger = Logger.getLogger(TAG);
+//	}
 
 	/*
 	 * 注册UiWatcher
@@ -736,18 +747,18 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 			setGivenParams(getUiObjectById("imei"), deviceInfo.getImei());
 			setGivenParams(getUiObjectById("android_id"), deviceInfo.getAndroidId());
 			setGivenParams(getUiObjectById("mac"), deviceInfo.getMacAddr());
-//			setGivenParams(getUiObjectById("ssid"), deviceInfo.getSSID());
-//			setGivenParams(getUiObjectById("bssid"), deviceInfo.getBSSID());
+			// setGivenParams(getUiObjectById("ssid"), deviceInfo.getSSID());
+			// setGivenParams(getUiObjectById("bssid"), deviceInfo.getBSSID());
 			setGivenParams(getUiObjectById("phoneNo"), deviceInfo.getPhoneNum());
 			setGivenParams(getUiObjectById("simSerial"), deviceInfo.getICCID());
 			setGivenParams(getUiObjectById("subscriberId"), deviceInfo.getIMSI());
-//			setGivenParams(getUiObjectById("simState"), deviceInfo.getSimStatus());
-//			setGivenParams(getUiObjectById("operId"), deviceInfo.getOperatorId());
-//			setGivenParams(getUiObjectById("operName"), deviceInfo.getOperatorName());
-//			setGivenParams(getUiObjectById("isoCode"), deviceInfo.getCountryCode());
+			// setGivenParams(getUiObjectById("simState"), deviceInfo.getSimStatus());
+			// setGivenParams(getUiObjectById("operId"), deviceInfo.getOperatorId());
+			// setGivenParams(getUiObjectById("operName"), deviceInfo.getOperatorName());
+			// setGivenParams(getUiObjectById("isoCode"), deviceInfo.getCountryCode());
 			setGivenParams(getUiObjectById("MODEL"), deviceInfo.getModel());
 			setGivenParams(getUiObjectById("MANUFACTURER"), deviceInfo.getManufacture());
-//			setGivenParams(getUiObjectById("HARDWARE"), deviceInfo.getHardware());
+			// setGivenParams(getUiObjectById("HARDWARE"), deviceInfo.getHardware());
 			setGivenParams(getUiObjectById("BRAND"), deviceInfo.getBrand());
 			getUiObjectById("button1").click();
 		} else {// 未指定参数

@@ -4,10 +4,10 @@ public class GlobalConsts {
 
 	public static final int RESULT_OK = 1;
 	public static final int RESULT_FAIL = 0;
-	public static final String PACKAGE_NAME = "com.andreader.prein";
+//	public static final String PACKAGE_NAME = "com.andreader.prein";
 	public static final String EXPOSED_PACKAGE_NAME = "com.example.myxposed";
 	// public static final String EXPOSED_PACKAGE_NAME = "com.soft.apk008v";
-	// public static final String PACKAGE_NAME ="com.ophone.reader.ui";
+	 public static final String PACKAGE_NAME ="com.ophone.reader.ui";
 	// public static final String FILE_NAME = "M30I0023.apk";
 	public static final String FILE_PATH = "H:\\eclipse-workspace\\MiguTestCase\\bin\\";
 	public static final String FILE_NAME = "M2660059.apk";
