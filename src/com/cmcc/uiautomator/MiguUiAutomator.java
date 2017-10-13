@@ -29,6 +29,7 @@ import android.graphics.Rect;
 import android.os.Environment;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.util.Log;
 import redis.clients.jedis.Jedis;
 
 /**
@@ -37,8 +38,8 @@ import redis.clients.jedis.Jedis;
 public class MiguUiAutomator extends UiAutomatorTestCase {
 
 	private static final String TAG = MiguUiAutomator.class.getSimpleName();
-//	private static Logger mLogger;
-	private static final String FORMAT_LOG = "---->> %s [%s] %s";
+	// private static Logger mLogger;
+	private static final String FORMAT_LOG = "---> %s [%s] %s";
 	private static final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 	private static final SimpleDateFormat KEY_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
 	private static final Point[] POINT = { new Point(120, 550), new Point(400, 550), new Point(680, 550),
@@ -61,8 +62,6 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	private static long endTime;
 	private static UserInfo userInfo;
 	private static DeviceInfo deviceInfo;
-	private static int bookCount = 3;// 默认阅读3本免费书籍
-	private static int pageCount = 30;// 默认单本阅读30页
 	private static int userType = 3;// 默认账号类型为无账号
 	private static int taskType = 1;// 默认任务类型为PV操作
 	private static int setOrNot = 0;// 默认不设置指定参数
@@ -87,8 +86,8 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 		jedis.auth(GlobalConsts.REDIS_PWD);
 		log("当前版本：" + GlobalConsts.RELEASE_VERSION);
 		if (taskType == 1) {
-			log("阅读书目数量：" + bookCount);
-			log("单本阅读页数：" + pageCount);
+			log("阅读书目数量：" + GlobalConsts.BOOK_COUNT);
+			log("单本阅读页数：" + GlobalConsts.PAGE_COUNT);
 			log("翻页时间间隔：" + GlobalConsts.PAGE_TURNING_TIME_INTERVAL + "ms");
 		}
 		// config();
@@ -100,7 +99,6 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	@Override
 	protected void tearDown() throws Exception {
 		log("tearDown of " + getName());
-		// onFinish();
 		super.tearDown();
 	}
 
@@ -112,20 +110,21 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	private static void init() {
 		endPoint.x = UiDevice.getInstance().getDisplayWidth();
 		endPoint.y = UiDevice.getInstance().getDisplayHeight();
-//		initLog4j();
+		// initLog4j();
 	}
 
-//	private static void initLog4j() {
-//		LogConfigurator logConfigurator = new LogConfigurator();
-//		logConfigurator.setFileName(Environment.getExternalStorageDirectory() + File.separator + redis_key + ".log");
-//		logConfigurator.setRootLevel(Level.DEBUG);
-//		logConfigurator.setFilePattern("%d %-5p [%c{2}]-[%L] %m%n");
-//		logConfigurator.setLevel("org.apache", Level.ERROR);
-//		logConfigurator.setMaxFileSize(1024 * 1024 * 2);
-//		logConfigurator.setImmediateFlush(true);
-//		logConfigurator.configure();
-//		mLogger = Logger.getLogger(TAG);
-//	}
+	// private static void initLog4j() {
+	// LogConfigurator logConfigurator = new LogConfigurator();
+	// logConfigurator.setFileName(Environment.getExternalStorageDirectory() +
+	// File.separator + redis_key + ".log");
+	// logConfigurator.setRootLevel(Level.DEBUG);
+	// logConfigurator.setFilePattern("%d %-5p [%c{2}]-[%L] %m%n");
+	// logConfigurator.setLevel("org.apache", Level.ERROR);
+	// logConfigurator.setMaxFileSize(1024 * 1024 * 2);
+	// logConfigurator.setImmediateFlush(true);
+	// logConfigurator.configure();
+	// mLogger = Logger.getLogger(TAG);
+	// }
 
 	/*
 	 * 注册UiWatcher
@@ -209,6 +208,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	public void testCase() {
 		String accountInfo = null;
 		while ((jedis.llen(redis_key) > 0)) {
+			log("<------------------------------start-------------------------------->");
 			log("当前账号数量:" + jedis.llen(redis_key));
 			try {
 				log("上一账号是否可用: " + valid);
@@ -236,7 +236,6 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 				restoreDeviceInfo();
 				valid = false;
 				excuteTask();
-				backToMainPage();
 				resultCode = 1;
 				resultMsg = "ok";
 			} catch (Exception e) {
@@ -245,6 +244,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 				onFinish();
 				exitApp();
 			}
+			log("<------------------------------end-------------------------------->");
 		}
 	}
 
@@ -274,6 +274,8 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	}
 
 	private void excuteTask() throws UiObjectNotFoundException {
+		if (setOrNot == 1)
+			return;
 		switch (taskType) {
 		case 2:
 			pay();
@@ -287,7 +289,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	private void read() throws UiObjectNotFoundException {
 		log("step8:执行阅读任务");
 		int index = checkUI();
-		int count = ((setOrNot == 1) ? 1 : bookCount);
+		int count = ((setOrNot == 1) ? 1 : GlobalConsts.BOOK_COUNT);
 		for (int i = 0; i < count; i++) {
 			readFreeBook(index);
 			index++;
@@ -435,15 +437,6 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	}
 
 	/*
-	 * 从免费频道页面返回到咪咕阅读首页
-	 **/
-	private void backToMainPage() throws UiObjectNotFoundException {
-		UiObject mBackBtn = getUiObjectById("titlebar_level_2_back_button", "free channel back button");
-		mBackBtn.clickAndWaitForNewWindow();
-		UiDevice.getInstance().pressBack();
-	}
-
-	/*
 	 * 将XML转为Document对象
 	 **/
 	private static void parseXML() throws DocumentException, IOException {
@@ -540,7 +533,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 		if (userType == 3) {
 			jedis.rpush(KEY_DATE_FORMAT.format(new Date()) + "_" + "imei", json_device);
 		} else {
-			jedis.rpush(userName + "_" + redis_key, json_device);
+			jedis.set(userName + "_" + redis_key, json_device);
 		}
 	}
 
@@ -677,7 +670,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	 **/
 	private static void exitApp() {
 		log("step9:退出咪咕阅读客户端");
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 6; i++) {
 			UiDevice.getInstance().pressBack();
 		}
 	}
@@ -908,7 +901,7 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 		setAssert("book page not exits", mFrameView.exists());
 		int num = (index < 9 ? index + 1 : index);
 		log("开始阅读第" + num + "本书");
-		for (int i = 0; i < pageCount; i++) {
+		for (int i = 0; i < GlobalConsts.PAGE_COUNT; i++) {
 			SystemClock.sleep(GlobalConsts.PAGE_TURNING_TIME_INTERVAL);
 			UiDevice.getInstance().pressKeyCode(25);
 		}
@@ -966,12 +959,13 @@ public class MiguUiAutomator extends UiAutomatorTestCase {
 	}
 
 	private static void log(String message) {
+		String out = String.format(FORMAT_LOG, getCurrentTime(), TAG, message);
+		Log.d(TAG, out);
 		PrintStream mPrintStream = null;
 		try {
 			mPrintStream = new PrintStream(System.out, true, "GB2312");
-			mPrintStream.println(String.format(FORMAT_LOG, getCurrentTime(), TAG, message));
+			mPrintStream.println(out);
 		} catch (UnsupportedEncodingException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
