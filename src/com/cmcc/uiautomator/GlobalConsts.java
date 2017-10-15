@@ -11,10 +11,10 @@ public class GlobalConsts {
 	public static final int REDIS_PORT = 7480;
 	public static final String REDIS_PWD = "r1B8QAIF5bHQjJqk";
 	public static final long TIME_OUT_FOR_EXISTS = 10 * 1000L;
-	public static final long PAGE_TURNING_TIME_INTERVAL = 1000L;
+	public static final long PAGE_TURNING_TIME_INTERVAL = 600L;
 	public static final long WEB_PAGE_LOAD_WAIT_SECONDS = 3 * 1000L;
 	public static final long TIME_OUT_SCROLL_ACKNOWLEDGEMENT = 5 * 1000L;
 	public static final int BOOK_COUNT = 3;
 	public static final int PAGE_COUNT = 80;
-	public static final long RELEASE_VERSION = 13;
+	public static final long RELEASE_VERSION = 14;
 }
