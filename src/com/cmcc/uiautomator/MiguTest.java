@@ -14,6 +14,7 @@ import org.dom4j.DocumentException;
 import org.dom4j.Element;
 import org.dom4j.io.SAXReader;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.android.uiautomator.core.UiCollection;
 import com.android.uiautomator.core.UiDevice;
@@ -33,8 +34,7 @@ import android.util.Log;
 import redis.clients.jedis.Jedis;
 
 /**
- * @author Admin
- * Created by Admin on 2017/8/27.
+ * @author Admin Created by Admin on 2017/8/27.
  */
 public class MiguTest extends UiAutomatorTestCase {
 
@@ -90,6 +90,7 @@ public class MiguTest extends UiAutomatorTestCase {
 		jedis = new Jedis(redis_ip, GlobalConsts.REDIS_PORT);
 		jedis.auth(GlobalConsts.REDIS_PWD);
 		log("当前版本：" + GlobalConsts.RELEASE_VERSION);
+		log("当前渠道：" + GlobalConsts.CHANNEL_ID);
 		if (taskType == 1) {
 			log("阅读书目数量：" + GlobalConsts.BOOK_COUNT);
 			log("单本阅读页数：" + GlobalConsts.PAGE_COUNT);
@@ -156,8 +157,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	}
 
 	/**
-	 * @author Admin
-	 * 配置参数
+	 * @author Admin 配置参数
 	 */
 	// private static void config() {
 	// Configurator.getInstance().setWaitForSelectorTimeout(GlobalConsts.TIME_OUT_FOR_EXISTS)
@@ -212,7 +212,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	public void testCase() {
 		String accountInfo = null;
 		while ((jedis.llen(redis_key) > 0)) {
-			log("<--------------------------start---------------------------->");
+			log("<-------------------------start--------------------------->");
 			log("当前账号数量:" + jedis.llen(redis_key));
 			try {
 				log("上一账号是否可用: " + valid);
@@ -296,7 +296,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	private void read() throws UiObjectNotFoundException {
 		log("step8:执行阅读任务");
 		int index = checkUI();
-		int count = ((setOrNot == 1) ? 1 : GlobalConsts.BOOK_COUNT);
+		int count = ((userType == 3) ? 1 : GlobalConsts.BOOK_COUNT);
 		for (int i = 0; i < count; i++) {
 			readFreeBook(index);
 			index++;
@@ -404,7 +404,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static void resolveParams(String accountInfo) {
 		log("step1:解析参数");
 		// json字符串转对象
-		userInfo = JSONObject.parseObject(accountInfo, UserInfo.class);
+		userInfo = JSON.parseObject(accountInfo, UserInfo.class);
 		setAssert("userInfo is a null reference", userInfo != null);
 		// 任务类型
 		taskType = Integer.parseInt(userInfo.getTaskType());
@@ -425,14 +425,13 @@ public class MiguTest extends UiAutomatorTestCase {
 		if (TextUtils.isEmpty(device)) {
 			setOrNot = 0;
 		} else {
-			deviceInfo = JSONObject.parseObject(device, DeviceInfo.class);
+			deviceInfo = JSON.parseObject(device, DeviceInfo.class);
 			setOrNot = 1;
 		}
 	}
 
 	/**
-	 * @author Admin
-	 * 第一次登陆
+	 * @author Admin 第一次登陆
 	 */
 	private static void firstToLoginPage() throws UiObjectNotFoundException {
 		// 点击左上角头像按钮
@@ -444,8 +443,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	}
 
 	/**
-	 * @author Admin
-	 * 将XML转为Document对象
+	 * @author Admin 将XML转为Document对象
 	 */
 	private static void parseXML() throws DocumentException, IOException {
 		log("step7:解析咪咕阅读客户端本地参数");
@@ -476,6 +474,7 @@ public class MiguTest extends UiAutomatorTestCase {
 				log("当前MAC:" + macAddress);
 			}
 			if ("channel_id".equals(attributeValue)) {
+				assertTrue("channel id does not match with the settings", GlobalConsts.CHANNEL_ID.equals(stringValue));
 				channelId = stringValue;
 				userInfo.setChannelId(channelId);
 				log("当前渠道:" + channelId);
@@ -902,10 +901,29 @@ public class MiguTest extends UiAutomatorTestCase {
 
 	private void openBookByDrag(int index) {
 		log("等待4s,以使书籍详情页面加载完成");
+		if (index == 9 || index == 0) {
+			SystemClock.sleep(4 * 1000L);
+			UiDevice.getInstance().click(endPoint.x - 5, 440);
+		}
 		SystemClock.sleep(4 * 1000L);
-		UiDevice.getInstance().click(endPoint.x - 5, 440);
-		SystemClock.sleep(1000L);
 		UiDevice.getInstance().swipe(endPoint.x - 5, 440, 0, 440, 5);
+		log("验证是否成功翻页");
+		new Thread(new Runnable() {
+			@Override
+			public void run() {
+				UiObject mReadBtn = new UiObject(new UiSelector().descriptionMatches("免费试读|继续阅读"));
+				mReadBtn.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS);
+				if (mReadBtn.exists()) {
+					log("未成功翻页，点击“免费试读|继续阅读”按钮进行翻页");
+					UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth() / 2,
+							UiDevice.getInstance().getDisplayHeight() - 30);
+				} else {
+					log("成功翻页，开始读书");
+				}
+			}
+
+		}).start();
+
 	}
 
 	private void readBook(int index) {
@@ -916,6 +934,11 @@ public class MiguTest extends UiAutomatorTestCase {
 		setAssert("book page not exits", mFrameView.exists());
 		int num = (index < 9 ? index + 1 : index);
 		log("开始阅读第" + num + "本书");
+		if (index == 9 || index == 0) {
+			UiDevice.getInstance().click(endPoint.x - 5, 440);
+			SystemClock.sleep(600L);
+			UiDevice.getInstance().click(endPoint.x - 5, 440);
+		}
 		for (int i = 0; i < GlobalConsts.PAGE_COUNT; i++) {
 			SystemClock.sleep(GlobalConsts.PAGE_TURNING_TIME_INTERVAL);
 			UiDevice.getInstance().pressKeyCode(25);
