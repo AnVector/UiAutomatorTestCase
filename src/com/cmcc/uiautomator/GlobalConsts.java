@@ -18,5 +18,5 @@ public class GlobalConsts {
 	public static final long TIME_OUT_SCROLL_ACKNOWLEDGEMENT = 5 * 1000L;
 	public static final int BOOK_COUNT = 5;
 	public static final int PAGE_COUNT = 80;
-	public static final long RELEASE_VERSION = 16;
+	public static final long RELEASE_VERSION = 17;
 }

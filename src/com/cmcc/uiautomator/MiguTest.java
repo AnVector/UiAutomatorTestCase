@@ -381,8 +381,9 @@ public class MiguTest extends UiAutomatorTestCase {
 		UiObject mPayInfoList = getUiObjectById("payInfoList", "pay option dialog");
 		// 查找“书券”支付方式并点击
 		log("查找“书券”支付选项");
+		int count = mPayInfoList.getChildCount();
 		UiObject mTicketOption = mPayInfoList
-				.getChild((new UiSelector().className("android.widget.RelativeLayout").instance(1)));
+				.getChild((new UiSelector().className("android.widget.RelativeLayout").instance(count - 1)));
 		setAssert("ticket option not exists", mTicketOption.exists());
 		log("点击“书券”选项");
 		mTicketOption.click();
@@ -488,9 +489,9 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static void handleDrawer() throws UiObjectNotFoundException {
 		UiObject mDrawerLayout = getUiObjectById("drawer_layout_mine", "main drawer layout");
 		if (mDrawerLayout.exists()) {
-			if (taskType == 2) {
-				bTokenCheck();
-			}
+			// if (taskType == 2) {
+			// bTokenCheck();
+			// }
 			UiDevice.getInstance().pressBack();
 		}
 		UiObject mSearchView = getUiObjectById("recom_btn_search", "main search button");
@@ -507,26 +508,29 @@ public class MiguTest extends UiAutomatorTestCase {
 			}
 		}
 	}
-
-	private static void bTokenCheck() throws UiObjectNotFoundException {
-		UiObject mTicket = getUiObjectById("fl_assets", "ticket item");
-		if (mTicket.exists()) {
-			UiObject mPrice = mTicket
-					.getChild(new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/item_tv_detail"));
-			String mDes = mPrice.getText().trim();
-			if (mDes.contains("元")) {
-				log("账户余额：" + mDes);
-				mDes = mDes.replace("元", "");
-				int value = (int) (Float.parseFloat(mDes) * 100);
-				if (value == 0) {
-					setAssert("account balance is insufficient", true);
-					throw new UiObjectNotFoundException("account balance is insufficient");
-				} else {
-					preBalance = Math.min(preBalance, value);
-				}
-			}
-		}
-	}
+	/**
+	 * 根据账户书券余额修改预支付金额
+	 */
+	// private static void bTokenCheck() throws UiObjectNotFoundException {
+	// UiObject mTicket = getUiObjectById("fl_assets", "ticket item");
+	// if (mTicket.exists()) {
+	// UiObject mPrice = mTicket
+	// .getChild(new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME +
+	// ":id/item_tv_detail"));
+	// String mDes = mPrice.getText().trim();
+	// if (mDes.contains("元")) {
+	// log("账户余额：" + mDes);
+	// mDes = mDes.replace("元", "");
+	// int value = (int) (Float.parseFloat(mDes) * 100);
+	// if (value == 0) {
+	// setAssert("account balance is insufficient", true);
+	// throw new UiObjectNotFoundException("account balance is insufficient");
+	// } else {
+	// preBalance = Math.min(preBalance, value);
+	// }
+	// }
+	// }
+	// }
 
 	/**
 	 * 保存设备信息
@@ -899,7 +903,7 @@ public class MiguTest extends UiAutomatorTestCase {
 		getUiObjectById("titlebar_text", "middle free channel page");
 	}
 
-	private void openBookByDrag(int index) {
+	private void openBookByDrag(int index) throws UiObjectNotFoundException {
 		log("等待4s,以使书籍详情页面加载完成");
 		if (index == 9 || index == 0) {
 			SystemClock.sleep(4 * 1000L);
@@ -912,18 +916,22 @@ public class MiguTest extends UiAutomatorTestCase {
 			@Override
 			public void run() {
 				UiObject mReadBtn = new UiObject(new UiSelector().descriptionMatches("免费试读|继续阅读"));
-				mReadBtn.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS);
+				mReadBtn.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS / 2);
 				if (mReadBtn.exists()) {
 					log("未成功翻页，点击“免费试读|继续阅读”按钮进行翻页");
-					UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth() / 2,
-							UiDevice.getInstance().getDisplayHeight() - 30);
+					try {
+						mReadBtn.clickAndWaitForNewWindow();
+					} catch (UiObjectNotFoundException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				} else {
 					log("成功翻页，开始读书");
 				}
+
 			}
 
 		}).start();
-
 	}
 
 	private void readBook(int index) {
@@ -934,14 +942,14 @@ public class MiguTest extends UiAutomatorTestCase {
 		setAssert("book page not exits", mFrameView.exists());
 		int num = (index < 9 ? index + 1 : index);
 		log("开始阅读第" + num + "本书");
-		if (index == 9 || index == 0) {
-			UiDevice.getInstance().click(endPoint.x - 5, 440);
-			SystemClock.sleep(600L);
-			UiDevice.getInstance().click(endPoint.x - 5, 440);
-		}
 		for (int i = 0; i < GlobalConsts.PAGE_COUNT; i++) {
 			SystemClock.sleep(GlobalConsts.PAGE_TURNING_TIME_INTERVAL);
-			UiDevice.getInstance().pressKeyCode(25);
+			if (i <= GlobalConsts.PAGE_COUNT / 2) {
+				UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth() / 2 + 30,
+						UiDevice.getInstance().getDisplayHeight() - 30);
+			} else {
+				UiDevice.getInstance().pressKeyCode(25);
+			}
 		}
 		log("第" + num + "本书阅读结束");
 	}
