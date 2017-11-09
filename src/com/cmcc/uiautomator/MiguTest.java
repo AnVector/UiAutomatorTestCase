@@ -37,7 +37,8 @@ import redis.clients.jedis.Jedis;
  * @author Admin Created by Admin on 2017/8/27.
  */
 public class MiguTest extends UiAutomatorTestCase {
-
+	
+//	private static Log logger = LogFactory.getLog(MiguTest.class);
 	private static final String TAG = MiguTest.class.getSimpleName();
 	private static final String FORMAT_LOG = "---> %s [%s] %s";
 	private static final SimpleDateFormat KEY_DATE_FORMAT = new SimpleDateFormat("yyyyMMdd");
@@ -56,7 +57,8 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static String password;
 	private static String imei = "unknown";
 	private static String macAddress = "unknown";
-	private static String channelId = "unkown";
+	private static String channelId = "unknown";
+	private static String packageName;
 	private static long startTime;
 	private static long endTime;
 	private static UserInfo userInfo;
@@ -78,6 +80,7 @@ public class MiguTest extends UiAutomatorTestCase {
 
 	@Override
 	protected void setUp() throws Exception {
+//		initLog4j();
 		log("setUp of " + getName());
 		redis_ip = getParams().getString("ip");
 		setAssert("please tell me a valid ip address of redis", (!TextUtils.isEmpty(redis_ip)));
@@ -85,12 +88,9 @@ public class MiguTest extends UiAutomatorTestCase {
 		redis_key = getParams().getString("key");
 		setAssert("please tell me a valid account key of redis", (!TextUtils.isEmpty(redis_key)));
 		log("redis_key=" + redis_key);
-		file_path = Environment.getDataDirectory() + "/data/" + GlobalConsts.PACKAGE_NAME
-				+ "/shared_prefs/CMReader.xml";
 		jedis = new Jedis(redis_ip, GlobalConsts.REDIS_PORT);
 		jedis.auth(GlobalConsts.REDIS_PWD);
 		log("当前版本：" + GlobalConsts.RELEASE_VERSION);
-		log("当前渠道：" + GlobalConsts.CHANNEL_ID);
 		if (taskType == 1) {
 			log("阅读书目数量：" + GlobalConsts.BOOK_COUNT);
 			log("单本阅读页数：" + GlobalConsts.PAGE_COUNT);
@@ -116,21 +116,24 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static void init() {
 		endPoint.x = UiDevice.getInstance().getDisplayWidth();
 		endPoint.y = UiDevice.getInstance().getDisplayHeight();
-		// initLog4j();
 	}
 
-	// private static void initLog4j() {
-	// LogConfigurator logConfigurator = new LogConfigurator();
-	// logConfigurator.setFileName(Environment.getExternalStorageDirectory() +
-	// File.separator + redis_key + ".log");
-	// logConfigurator.setRootLevel(Level.DEBUG);
-	// logConfigurator.setFilePattern("%d %-5p [%c{2}]-[%L] %m%n");
-	// logConfigurator.setLevel("org.apache", Level.ERROR);
-	// logConfigurator.setMaxFileSize(1024 * 1024 * 2);
-	// logConfigurator.setImmediateFlush(true);
-	// logConfigurator.configure();
-	// mLogger = Logger.getLogger(TAG);
-	// }
+//	 private static void initLog4j() {
+//		 Properties pro=new Properties();
+//		 pro.put("log4j.rootLogger", "info,stdout,MongoDB");
+//		 pro.put("log4j.logger.org.apache", "info");
+//		 pro.put("log4j.appender.stdout", "org.apache.log4j.ConsoleAppender");
+//		 pro.put("log4j.appender.stdout.layout", "org.apache.log4j.PatternLayout");
+//		 pro.put("log4j.appender.stdout.layout.ConversionPattern", "%d{yyyy-MM-dd HH:mm:ss,SSS} %5p %c{1}:%L - %m%n");
+//		 pro.put("log4j.appender.MongoDB", "org.log4mongo.MongoDbAppender");
+//		 pro.put("log4j.appender.MongoDB.databaseName", "migu");
+//		 pro.put("log4j.appender.MongoDB.collectionName", "logs");
+//		 pro.put("log4j.appender.MongoDB.hostname", "112.17.64.115");
+//		 pro.put("log4j.appender.MongoDB.port", "27017");
+//		 pro.put("log4j.appender.MongoDB.userName", "db_flag");
+//		 pro.put("log4j.appender.MongoDB.password", "db_flag");
+//		 PropertyConfigurator.configure(pro);
+//	 }
 
 	/**
 	 * 注册UiWatcher
@@ -312,8 +315,7 @@ public class MiguTest extends UiAutomatorTestCase {
 				SystemClock.sleep(500L);
 				UiDevice.getInstance().click(458, 569);
 			}
-			UiScrollable mListView = new UiScrollable(
-					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/expendlist"));
+			UiScrollable mListView = new UiScrollable(new UiSelector().resourceId(packageName + ":id/expendlist"));
 			mListView.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS);
 			if (mListView.exists()) {
 				return mListView;
@@ -362,8 +364,7 @@ public class MiguTest extends UiAutomatorTestCase {
 		int index = 1;
 		UiObject mItem = null;
 		while (Float.parseFloat(mPrice.getText().trim()) * 100 <= preBalance) {
-			mItem = mListView.getChild(
-					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/checkbox_group").instance(index));
+			mItem = mListView.getChild(new UiSelector().resourceId(packageName + ":id/checkbox_group").instance(index));
 			setAssert("chapter item by index not found", mItem.exists());
 			mItem.click();
 			index++;
@@ -413,6 +414,13 @@ public class MiguTest extends UiAutomatorTestCase {
 		setOrNot = Integer.parseInt(userInfo.getSetOrNot());
 		// 用户类型 userType: 0 手机号；1 邮箱；2 自定义；3 无账号
 		userType = Integer.parseInt(userInfo.getUserType());
+		packageName = userInfo.getPackageName();
+		assertTrue("application name is not set", !TextUtils.isEmpty(packageName));
+		log("当前包名：" + packageName);
+		file_path = Environment.getDataDirectory() + "/data/" + packageName + "/shared_prefs/CMReader.xml";
+		channelId = userInfo.getChannelId();
+		assertTrue("channel id is not set", !TextUtils.isEmpty(channelId));
+		log("当前渠道：" + channelId);
 		// 无账户用户
 		if (userType == 3) {
 			return;
@@ -475,10 +483,8 @@ public class MiguTest extends UiAutomatorTestCase {
 				log("当前MAC:" + macAddress);
 			}
 			if ("channel_id".equals(attributeValue)) {
-				assertTrue("channel id does not match with the settings", GlobalConsts.CHANNEL_ID.equals(stringValue));
-				channelId = stringValue;
-				userInfo.setChannelId(channelId);
-				log("当前渠道:" + channelId);
+				log("当前渠道:" + stringValue);
+				assertTrue("channel id does not match with the settings", channelId.equals(stringValue));
 			}
 		}
 	}
@@ -496,8 +502,7 @@ public class MiguTest extends UiAutomatorTestCase {
 		}
 		UiObject mSearchView = getUiObjectById("recom_btn_search", "main search button");
 		if (!mSearchView.exists()) {
-			UiObject mLoginError = new UiObject(
-					new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/tv_main_error_message"));
+			UiObject mLoginError = new UiObject(new UiSelector().resourceId(packageName + ":id/tv_main_error_message"));
 			mLoginError.waitForExists(5 * 1000L);
 			if (mLoginError.exists()) {
 				setAssert(mLoginError.getText().trim(), true);
@@ -515,7 +520,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	// UiObject mTicket = getUiObjectById("fl_assets", "ticket item");
 	// if (mTicket.exists()) {
 	// UiObject mPrice = mTicket
-	// .getChild(new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME +
+	// .getChild(new UiSelector().resourceId(packageName +
 	// ":id/item_tv_detail"));
 	// String mDes = mPrice.getText().trim();
 	// if (mDes.contains("元")) {
@@ -676,7 +681,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static void launchApp() throws IOException {
 		// 打开咪咕阅读
 		log("step4:打开咪咕阅读");
-		Runtime.getRuntime().exec("monkey -p " + GlobalConsts.PACKAGE_NAME + " -v 1");
+		Runtime.getRuntime().exec("monkey -p " + packageName + " -v 1");
 	}
 
 	/**
@@ -694,7 +699,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	 */
 	private static void clearCache() throws IOException {
 		log("step2:清除应用缓存");
-		Runtime.getRuntime().exec("pm clear " + GlobalConsts.PACKAGE_NAME);
+		Runtime.getRuntime().exec("pm clear " + packageName);
 	}
 
 	/**
@@ -793,7 +798,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	}
 
 	private static UiObject getUiObjectById(String resourceId, String des) throws UiObjectNotFoundException {
-		UiObject mEditText = new UiObject(new UiSelector().resourceId(GlobalConsts.PACKAGE_NAME + ":id/" + resourceId));
+		UiObject mEditText = new UiObject(new UiSelector().resourceId(packageName + ":id/" + resourceId));
 		mEditText.waitForExists(GlobalConsts.TIME_OUT_FOR_EXISTS);
 		setAssert(des + " not exists", mEditText.exists());
 		return mEditText;
@@ -942,9 +947,10 @@ public class MiguTest extends UiAutomatorTestCase {
 		setAssert("book page not exits", mFrameView.exists());
 		int num = (index < 9 ? index + 1 : index);
 		log("开始阅读第" + num + "本书");
-		for (int i = 0; i < GlobalConsts.PAGE_COUNT; i++) {
+		int pageCount = ((userType == 3) ? 30 : GlobalConsts.PAGE_COUNT);
+		for (int i = 0; i < pageCount; i++) {
 			SystemClock.sleep(GlobalConsts.PAGE_TURNING_TIME_INTERVAL);
-			if (i <= GlobalConsts.PAGE_COUNT / 2) {
+			if (i <= pageCount / 2) {
 				UiDevice.getInstance().click(UiDevice.getInstance().getDisplayWidth() / 2 + 30,
 						UiDevice.getInstance().getDisplayHeight() - 30);
 			} else {
@@ -1008,6 +1014,7 @@ public class MiguTest extends UiAutomatorTestCase {
 	private static void log(String message) {
 		String out = String.format(FORMAT_LOG, getCurrentTime(), TAG, message);
 		Log.d(TAG, out);
+//		logger.info(message);
 		PrintStream mPrintStream = null;
 		try {
 			mPrintStream = new PrintStream(System.out, true, "GB2312");
